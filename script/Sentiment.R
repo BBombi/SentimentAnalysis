@@ -4,7 +4,7 @@ if(require("pacman")=="FALSE"){
 }
 pacman::p_load(ggplot2, rstudioapi, plyr, purrr, readr, plotly, caret,
                RColorBrewer, caretEnsemble, parallel, doMC, randomForest, 
-               DescTools, ggpubr, ggthemes, corrplot, C50, e1071)
+               DescTools, ggpubr, ggthemes, corrplot, C50, e1071, car)
 
 current_path <- getActiveDocumentContext()$path
 setwd(dirname(dirname(current_path)))
@@ -18,39 +18,40 @@ galaxy$df <- read.csv("datasets/galaxy_smallmatrix_labeled_9d.csv")
 iphone$df <- read.csv("datasets/iphone_smallmatrix_labeled_8d.csv")
 
   # Checking Correlations ----
-# Apple <- grep("iphone", names(galaxy$df), value=T) # "iphonesentiment" excluded
-# Samsung <- grep("samsung", names(iphone$df), value=T) # "galaxysentiment" excluded
-
 corrplot(cor(iphone$df[!duplicated(iphone$df), ]))
 corrplot(cor(galaxy$df[!duplicated(galaxy$df), ]))
 
+ # Removing multicolinearity and duplicates ----
+iphone$newdf <- iphone$df[!duplicated(iphone$df), ]
+# iphone$newdf <-iphone$newdf[ ,c((which(vif(lm(iphonesentiment ~ ., 
+#                               data = iphone$df[!duplicated(iphone$df), ])) 
+#                        <= 5)),59)]
+galaxy$newdf <- galaxy$df[!duplicated(galaxy$df), ]
+# galaxy$newdf <-   galaxy$newdf[ ,c((which(vif(lm(galaxysentiment ~ ., 
+#                              data = galaxy$df[!duplicated(galaxy$df), ])) 
+#                        <= 5)),59)]
 # Factoring dependant variables ----
 galaxy$df$galaxysentiment <- as.factor(galaxy$df$galaxysentiment)
 iphone$df$iphonesentiment <- as.factor(iphone$df$iphonesentiment)
-
-# Removing duplicates: -----
-galaxy$newdf <- galaxy$df[!duplicated(galaxy$df), ]
-iphone$newdf <- iphone$df[!duplicated(iphone$df), ]
+galaxy$newdf$galaxysentiment <- as.factor(galaxy$newdf$galaxysentiment)
+iphone$newdf$iphonesentiment <- as.factor(iphone$newdf$iphonesentiment)
 
 # Spliting the data ----
 set.seed(123)
-# iphone$sample <- iphone$df %>% dplyr::group_by(iphonesentiment) %>%
-#   dplyr::sample_n(ifelse(dplyr::n() < 350, dplyr::n(), 350))
 inTrain <- createDataPartition(y = iphone$newdf$iphonesentiment, 
-                               p = 0.7, list = FALSE)
+                               p = 0.75, list = FALSE)
 iphone$train <- iphone$newdf[inTrain,]
-  # iphone$sample %>% dplyr::group_by(iphonesentiment) %>%
-  # dplyr::sample_frac(.70)
-iphone$test <- iphone$df[-inTrain,]
-  # dplyr::anti_join(iphone$df, iphone$train)
-galaxy$train <- galaxy$df %>% dplyr::group_by(iphonesentiment) %>% 
-  dplyr::sample_n(ifelse(dplyr::n() > 350, 350, dplyr::n()))
-galaxy$test <- galaxy$df[2001:nrow(galaxy$df), ]
+iphone$test <- iphone$newdf[-inTrain,]
+
+inTrain <- createDataPartition(y = galaxy$newdf$galaxysentiment, 
+                               p = 0.75, list = FALSE)
+galaxy$train <- galaxy$newdf[inTrain,]
+galaxy$test <- galaxy$newdf[-inTrain,]
 
  # Principal Component Analysis----
-iphone$preprocessParams <- preProcess(iphone$train[,-59], 
-                                      method=c("center", "scale", "pca", "nzv"), 
-                                      thresh = 0.95)
+iphone$preprocessParams <- preProcess(iphone$train[,-ncol(iphone$train)], 
+                                      method="pca", 
+                                      thresh = 0.88)
 print(iphone$preprocessParams)
 iphone$train.pca <- predict(iphone$preprocessParams, iphone$train[,-59])
 iphone$train.pca$iphonesentiment <- iphone$train$iphonesentiment
@@ -59,41 +60,67 @@ iphone$test.pca$iphonesentiment <- iphone$test$iphonesentiment
 iphone$df.pca <- predict(iphone$preprocessParams, iphone$df[,-59])
 iphone$df.pca$iphonesentiment <- iphone$df$iphonesentiment
 
-# Models ----
-models <- c("C5.0", "rf", "knn")
-for (i in models) {
-  iphone[[i]] <- train(iphonesentiment~.,
-                       data = iphone$train.pca, 
-                       method = i,
-                       trControl = trainControl(method = "cv",
-                                                number = 5,
-                                                verboseIter = TRUE,
-                                                sampling = "up"),
-                       metric = "Kappa")
-  
-  iphone[[paste0("pred_",i)]] <- predict(iphone[[i]], newdata = iphone$test.pca)
-  iphone[[paste0("conf_mtx_",i)]] <-table(iphone[[paste0("pred_",i)]], 
-                                          iphone$test.pca$iphonesentiment)
-  iphone[[paste0("accuracy_",i)]] <- postResample(iphone[[paste0("pred_",i)]],
-                                                  iphone$test.pca$iphonesentiment)
-  
-}
-rm(i, models)
+galaxy$preprocessParams <- preProcess(galaxy$train[,-ncol(galaxy$train)], 
+                                      method="pca", 
+                                      thresh = 0.88)
+print(galaxy$preprocessParams)
+galaxy$train.pca <- predict(galaxy$preprocessParams, galaxy$train[,-59])
+galaxy$train.pca$galaxysentiment <- galaxy$train$galaxysentiment
+galaxy$test.pca <- predict(galaxy$preprocessParams, galaxy$test[,-59])
+galaxy$test.pca$galaxysentiment <- galaxy$test$galaxysentiment
+galaxy$df.pca <- predict(galaxy$preprocessParams, galaxy$df[,-59])
+galaxy$df.pca$galaxysentiment <- galaxy$df$galaxysentiment
+
+# Models for Iphone ----
+iphone$C5.0 <- train(iphonesentiment ~ .,
+                     data = iphone$train.pca,
+                     method = "C5.0",
+                     trControl = trainControl(method = "repeatedcv",
+                                              number = 10,
+                                              repeats = 10, 
+                                              returnResamp="all",
+                                              verboseIter = TRUE),
+                     metric = "Kappa",
+                     preProcess = c("center", "scale"))
 
 iphone$svm <- svm(iphonesentiment ~.,
                   data = iphone$train.pca)
 iphone$pred_svm <- predict(iphone$svm, newdata = iphone$test.pca)
 iphone$accuracy_svm <- postResample(iphone$pred_svm, 
                                     iphone$test.pca$iphonesentiment)
-  # RF
-postResample(predict(iphone$rf, newdata = iphone$df.pca),
-             iphone$df.pca$iphonesentiment)
-  # k-NN
-postResample(predict(iphone$knn, newdata = iphone$df.pca),
-             iphone$df.pca$iphonesentiment)
   # C5.0
 postResample(predict(iphone$C5.0, newdata = iphone$df.pca),
              iphone$df.pca$iphonesentiment)
   # SVM
 postResample(predict(iphone$svm, newdata = iphone$df.pca),
              iphone$df.pca$iphonesentiment)
+ #Models for Galaxy ----
+galaxy$C5.0 <- train(galaxysentiment ~ .,
+                     data = galaxy$train.pca,
+                     method = "C5.0",
+                     trControl = trainControl(method = "repeatedcv",
+                                              number = 10,
+                                              repeats = 10, 
+                                              returnResamp="all",
+                                              verboseIter = TRUE),
+                     metric = "Kappa",
+                     preProcess = c("center", "scale"))
+
+galaxy$svm <- svm(galaxysentiment ~.,
+                  data = galaxy$train.pca)
+
+
+# C5.0
+postResample(predict(galaxy$C5.0, newdata = galaxy$df.pca),
+             galaxy$df.pca$galaxysentiment)
+# SVM
+postResample(predict(galaxy$svm, newdata = galaxy$df.pca),
+             galaxy$df.pca$galaxysentiment)
+
+# Loading the real Testset and applying the models ----
+RealTest <- rbind(read.csv("datasets/Alejo_combinedFile.csv"),
+                  read.csv("datasets/concatenated_factors_borja.csv"),
+                  read.csv("datasets/concatenated_factors1.csv"),
+                  read.csv("datasets/concatenated_factors_0_100.csv"),
+                  read.csv("datasets/concatenated_factors2.csv"),
+                  read.csv("datasets/LargeMatrix.csv"))
