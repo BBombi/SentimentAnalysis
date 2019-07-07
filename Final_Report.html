@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+<meta name="author" content="Borja Bombi" />
+
+
+<title>Final Report</title>
+
+<script src="Final_Report_files/jquery-1.11.3/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="Final_Report_files/bootstrap-3.3.6/css/bootstrap.min.css" rel="stylesheet" />
+<script src="Final_Report_files/bootstrap-3.3.6/js/bootstrap.min.js"></script>
+<script src="Final_Report_files/jqueryui-1.11.4/jquery-ui.min.js"></script>
+<script src="Final_Report_files/navigation-1.1/tabsets.js"></script>
+<script src="Final_Report_files/navigation-1.1/codefolding.js"></script>
+<link href="Final_Report_files/magnific-popup-1.1.0/magnific-popup.css" rel="stylesheet" />
+<script src="Final_Report_files/magnific-popup-1.1.0/jquery.magnific-popup.min.js"></script>
+<link href="Final_Report_files/readthedown-0.1/readthedown.css" rel="stylesheet" />
+<script src="Final_Report_files/readthedown-0.1/readthedown.js"></script>
+
+
+
+
+</head>
+
+<body>
+
+
+<div id="content" data-toggle="wy-nav-shift">
+
+<!-- tabsets -->
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+</script>
+
+<!-- code folding -->
+
+<nav id="nav-top" role="navigation" aria-label="top navigation">
+    <a role="button" href="#" data-toggle="wy-nav-top"><span class="glyphicon glyphicon-menu-hamburger"></span></a>
+</nav>
+
+
+<div id="header">
+<h1 class="title">Final Report</h1>
+</div>
+
+
+<div id="table-of-contents">
+    <h2><a href="#content">Final Report</a></h2>
+    <div id="text-table-of-contents">
+      <ul>
+      <li><a href="#exploratory-analysis">Exploratory analysis</a><ul>
+      <li><a href="#correlation-analysis">Correlation analysis</a></li>
+      <li><a href="#check-for-distributions">Check for distributions</a></li>
+      </ul></li>
+      <li><a href="#preprocess-and-modeling">Preprocess and Modeling</a><ul>
+      <li><a href="#split-the-data-and-applying-pca-method.">Split the data and applying PCA method.</a></li>
+      <li><a href="#train-a-model-for-iphone-sentiment">Train a model for <em>iPhone Sentiment</em></a></li>
+      <li><a href="#train-a-model-for-galaxy-sentiment">Train a model for <em>Galaxy Sentiment</em></a></li>
+      </ul></li>
+      <li><a href="#collecting-the-data">Collecting the data</a><ul>
+      <li><a href="#scrapping-the-web-with-amazon-web-services-aws">Scrapping the web with Amazon Web Services (AWS)</a></li>
+      </ul></li>
+      <li><a href="#conclusions">Conclusions</a><ul>
+      <li><a href="#iphone-vs-galaxy">iPhone vs Galaxy:</a></li>
+      <li><a href="#observations">Observations</a></li>
+      </ul></li>
+      </ul>
+    </div>
+</div>
+
+<div id="main">
+<p><strong>Samsung Galaxy vs. Apple iPhone: People’s preferences over the internet</strong></p>
+<div id="exploratory-analysis" class="section level2">
+<h2>Exploratory analysis</h2>
+<div id="correlation-analysis" class="section level3">
+<h3>Correlation analysis</h3>
+<p>In the initial exploration, we can see that there are some correlation on both Apple and Samsung features, but that doesn’t really affect at the Iphone or Galaxy sentiment, as they are not showing a strong correlation among them.</p>
+<p><img src="Final_Report_files/figure-html/corrplot%201-1.png" width="768" /><img src="Final_Report_files/figure-html/corrplot%201-2.png" width="768" /></p>
+</div>
+<div id="check-for-distributions" class="section level3">
+<h3>Check for distributions</h3>
+<p>As it can be observed, both distributions tend to the <strong>highest score</strong> (5 out of 5 points), despite taht there are also quite a few observations at the <strong>lowest score</strong> as well (0 out of 5). The barely non observations for any of 1 and 2 points on those datasets, lead me to believe that the bast majority of the articles written would be hating the devices, or in between kind of like them or loving them. The reason might be “it doesn’t worth to write a comment or an article to express a slight dislike of the terminal”.</p>
+<p><img src="Final_Report_files/figure-html/fdensity%20plot-1.png" width="768" /><img src="Final_Report_files/figure-html/fdensity%20plot-2.png" width="768" /></p>
+</div>
+</div>
+<div id="preprocess-and-modeling" class="section level2">
+<h2>Preprocess and Modeling</h2>
+<div id="split-the-data-and-applying-pca-method." class="section level3">
+<h3>Split the data and applying PCA method.</h3>
+<p>In order to get the best possible results, I have removed all the duplicates from the dataframe to reduce the “noise”.</p>
+<p>I have also split the data into a trainset (70% of the observations), and a testset.</p>
+<p>Finally, I have applied the PCA (<em>Principal Component Analysis</em>) that consist in removing all of the features and replaces them with mathematical representations of their variance.</p>
+<p><strong>For <em>iPhone Sentiment</em> </strong></p>
+<pre><code>## Created from 1809 samples and 58 variables
+## 
+## Pre-processing:
+##   - centered (58)
+##   - ignored (0)
+##   - principal component signal extraction (58)
+##   - scaled (58)
+## 
+## PCA needed 20 components to capture 90 percent of the variance</code></pre>
+<p><strong>For <em>Galaxy Sentiment</em> </strong></p>
+<pre><code>## Created from 1850 samples and 58 variables
+## 
+## Pre-processing:
+##   - centered (58)
+##   - ignored (0)
+##   - principal component signal extraction (58)
+##   - scaled (58)
+## 
+## PCA needed 20 components to capture 90 percent of the variance</code></pre>
+</div>
+<div id="train-a-model-for-iphone-sentiment" class="section level3">
+<h3>Train a model for <em>iPhone Sentiment</em></h3>
+<p><strong>SVM</strong></p>
+<p><strong>SVM</strong> model has one of the best <em>Accuracy</em> based on this data frame, but the <em>Kappa</em> is poor if we compare it with the one for <strong>C5.0</strong>.</p>
+<pre><code>##  Accuracy     Kappa 
+## 0.6763278 0.3389274</code></pre>
+<p><strong>C5.0</strong></p>
+<p>We can observe that the best <em>Accuracy</em> and <em>Kappa</em> correspond to <strong>C5.0</strong> model, so this is the one that we’ll be using to predict the iPhone Sentiment.</p>
+<pre><code>##  Accuracy     Kappa 
+## 0.7646651 0.5489555</code></pre>
+</div>
+<div id="train-a-model-for-galaxy-sentiment" class="section level3">
+<h3>Train a model for <em>Galaxy Sentiment</em></h3>
+<p><strong>SVM</strong> For <em>Galaxy Sentiment</em>, we can observe that both <strong>SVM</strong> and <strong>C5.0</strong> models have a tie <em>Accuracy</em>, but this time, we’ll use <strong>SVM</strong> model because has a slightly better <em>Kappa</em> than the <strong>C5.0</strong>.</p>
+<pre><code>##  Accuracy     Kappa 
+## 0.6818217 0.3148075</code></pre>
+<p><strong>C5.0</strong></p>
+<p>On both cases (<strong>SVM</strong> and <strong>C5.0</strong> models), the <em>Kappa</em> is lower than the one for the <em>iPhone Sentiment</em>, and this indicates us that this model is not as reliable as it is desirable.</p>
+<pre><code>##  Accuracy     Kappa 
+## 0.6826737 0.2996616</code></pre>
+</div>
+</div>
+<div id="collecting-the-data" class="section level2">
+<h2>Collecting the data</h2>
+<div id="scrapping-the-web-with-amazon-web-services-aws" class="section level3">
+<h3>Scrapping the web with Amazon Web Services (AWS)</h3>
+<p><strong>AWS</strong> is a reliable, scalable, and inexpensive platform for the use of cloud applications and services and it will give us easy access to web data through one management console.</p>
+<p>With <em>Amazon Elastic Compute Cloud (EC2)</em> we can run application programs in the Amazon computing environment. EC2 can serve as a practically unlimited set of virtual machines</p>
+<p>With <em>Amazon Elastic MapReduce (EMR)</em> we can easily and cost-effectively process vast amounts of data.</p>
+<p>Finally, <em>Amazon Simple Storage Services (S3)</em> is storage designed to make web-scale computing easier for developers and provides a simple web services interface that can be used to store and retrieve any amount of data, at any time, from anywhere on the web.</p>
+</div>
+</div>
+<div id="conclusions" class="section level2">
+<h2>Conclusions</h2>
+<div id="iphone-vs-galaxy" class="section level3">
+<h3>iPhone vs Galaxy:</h3>
+<p>At the below table we can see the sentiment predictions based on our predictive models.</p>
+<table>
+<thead>
+<tr class="header">
+<th><em>Sentiment</em></th>
+<th align="center"><strong>Apple iphone</strong></th>
+<th align="center"><strong>Samsung Galaxy</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>0</strong>: very negative</td>
+<td align="center">25897</td>
+<td align="center">8857</td>
+</tr>
+<tr class="even">
+<td><strong>1</strong>: negative</td>
+<td align="center">0</td>
+<td align="center">0</td>
+</tr>
+<tr class="odd">
+<td><strong>2</strong>: somewhat negative</td>
+<td align="center">1690</td>
+<td align="center">3012</td>
+</tr>
+<tr class="even">
+<td><strong>3</strong>: somewhat positive</td>
+<td align="center">2354</td>
+<td align="center">0</td>
+</tr>
+<tr class="odd">
+<td><strong>4</strong>: positive</td>
+<td align="center">1332</td>
+<td align="center">52</td>
+</tr>
+<tr class="even">
+<td><strong>5</strong>: very positive</td>
+<td align="center">26885</td>
+<td align="center">46237</td>
+</tr>
+<tr class="odd">
+<td><strong>Mean</strong></td>
+<td align="center"><strong>2.58</strong></td>
+<td align="center"><strong>4.08</strong></td>
+</tr>
+</tbody>
+</table>
+<p>We observe that there are a bast majority of websites who love Samsung Galaxy, while the Apple iPhone is somehow in between, as there are almost the same amount of websites that loves the iPhone than hates it.</p>
+<p>For that reason, we cautiously conclude that the Samsung Galaxy is more likely to be the device that <em>Alert Analytics</em> should chose to develop their APP.</p>
+</div>
+<div id="observations" class="section level3">
+<h3>Observations</h3>
+<p>As we have already mentioned, the <em>Kappa</em> for <strong>SVM</strong> model in order to predict the sentiment through Samsung Galaxy device is not as good as desirable, as the <em>Kappa</em> is the coefficient that takes into account the possibility of the agreement occurring by chance. With a lower value of <em>Kappa</em>, our model does not really predict the reality better than mere chance.</p>
+<p>If we compare the amount of lines where both devices are equally valued, we can see that this is bast majority, as correspond to a nearly 58% of the times.</p>
+<pre><code>##     0     1     2     3     4     5 
+##  6967     0  1461     0    14 25254</code></pre>
+<p><img src="Final_Report_files/figure-html/Real%20Testset%203-1.png" width="768" /><img src="Final_Report_files/figure-html/Real%20Testset%203-2.png" width="768" /></p>
+<p>If we take a closer look at the <em>Very Possitive</em>, we observe that 25254 out of 26885 predictions for iphone match with the <em>Very Possitive</em> on Samsung Galaxy. This means that 94% of the times that the model predicts the higher score for the iPhone, it also does for the Galaxy.</p>
+<p>In my humble opinion, this is unrealistic, as we would expect that the majority of the reviews would take a “winner” (a device that is more likely for the user).</p>
+<pre><code>##   x  freq
+## 1 5 25254</code></pre>
+</div>
+</div>
+</div>
+
+
+</div>
+
+<div id="postamble" data-toggle="wy-nav-shift" class="status">
+<p class="author"><span class="glyphicon glyphicon-user"></span> Borja Bombi</p>
+<p class="date"><span class="glyphicon glyphicon-calendar"></span> 7/7/2019</p>
+</div>
+
+
+<script>
+$(document).ready(function () {
+ 	 	$('#content img')
+ 	  .addClass("image-thumb");
+      $('#content img')
+ 	  .addClass("image-lb");
+  $('#content').magnificPopup({
+	      type:'image',
+	      closeOnContentClick: false,
+	      closeBtnInside: false,
+	      delegate: 'img',
+	      gallery: {enabled: true },
+	      image: {
+	        verticalFit: true,
+          titleSrc: 'alt'
+	      }
+ 	    });
+ 	});
+</script>
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

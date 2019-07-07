@@ -1,0 +1,266 @@
+---
+title: "Final Report"
+author: "Borja Bombi"
+date: "7/7/2019"
+output:
+  rmdformats::readthedown:
+    self_contained: false
+    thumbnails: true
+    lightbox: true
+    toc_depth: 3
+    gallery: true
+    highlight: tango
+    html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+**Samsung Galaxy vs. Apple iPhone: People's preferences over the internet**
+
+## Exploratory analysis
+
+```{r import, include=FALSE} 
+
+pacman::p_load(ggplot2, rstudioapi, plyr, purrr, readr, plotly, caret,
+               RColorBrewer, caretEnsemble, parallel, doMC, randomForest, 
+               DescTools, ggpubr, ggthemes, corrplot, C50, e1071, car, 
+               prettydoc, RColorBrewer)
+
+galaxy <- list(c())
+iphone <- list(c())
+galaxy$df <- read.csv("datasets/galaxy_smallmatrix_labeled_9d.csv")
+iphone$df <- read.csv("datasets/iphone_smallmatrix_labeled_8d.csv")
+
+ # Checking Correlations ----
+Apple <- c(grep("iphone", names(iphone$df[1:58]), value=T), "ios")
+Samsung <- c(grep("samsung", names(galaxy$df[1:58]), value=T), "googleandroid")
+
+```
+
+### Correlation analysis
+
+In the initial exploration, we can see that there are some correlation on both Apple and Samsung features, but that doesn't really affect at the Iphone or Galaxy sentiment, as they are not showing a strong correlation among them.
+
+```{r corrplot 1, echo=FALSE}
+corrplot(cor(iphone$df[!duplicated(iphone$df), Apple]))
+corrplot(cor(galaxy$df[!duplicated(galaxy$df), Samsung]))
+```
+
+### Check for distributions
+
+As it can be observed, both distributions tend to the **highest score** (5 out of 5 points), despite taht there are also quite a few observations at the **lowest score** as well (0 out of 5). The barely non observations for any of 1 and 2 points on those datasets, lead me to believe that the bast majority of the articles written would be hating the devices, or in between kind of like them or loving them. The reason might be "it doesn't worth to write a comment or an article to express a slight dislike of the terminal".
+
+```{r fdensity plot, echo=FALSE}
+ggplot(iphone$df, aes(x=iphonesentiment)) + 
+  geom_histogram(aes(y=..density..), colour="black", 
+                 fill=brewer.pal(name = "RdBu", n=6), bins = 6) +
+  labs(title = "iPhone Sentiment") + xlab(NULL)
+
+ggplot(galaxy$df, aes(x=galaxysentiment)) + 
+  geom_histogram(aes(y=..density..), colour="black", 
+                 fill=brewer.pal(name = "YlGn", n=6), bins = 6) +
+  labs(title = "Galaxy Sentiment") + xlab(NULL)
+
+```
+
+```{r factor and duplicates, echo=FALSE, include=FALSE}
+# Factoring dependant variables ----
+galaxy$df$galaxysentiment <- as.factor(galaxy$df$galaxysentiment)
+iphone$df$iphonesentiment <- as.factor(iphone$df$iphonesentiment)
+
+ # Removing duplicates ----
+iphone$newdf <- iphone$df[!duplicated(iphone$df),]
+galaxy$newdf <- galaxy$df[!duplicated(galaxy$df),]
+
+# Spliting the data ----
+set.seed(123)
+inTrain <- createDataPartition(y = iphone$newdf$iphonesentiment, 
+                               p = 0.7, list = FALSE)
+iphone$train <- iphone$newdf[inTrain,]
+iphone$test <- iphone$newdf[-inTrain,]
+
+set.seed(123)
+inTrain <- createDataPartition(y = galaxy$newdf$galaxysentiment, 
+                               p = 0.7, list = FALSE)
+galaxy$train <- galaxy$newdf[inTrain,]
+galaxy$test <- galaxy$newdf[-inTrain,]
+
+ # Principal Component Analysis----
+iphone$preprocessParams <- preProcess(iphone$train[,-ncol(iphone$train)], 
+                                      method="pca", 
+                                      thresh = 0.90)
+print(iphone$preprocessParams)
+iphone$train.pca <- predict(iphone$preprocessParams, iphone$train[,-59])
+iphone$train.pca$iphonesentiment <- iphone$train$iphonesentiment
+iphone$test.pca <- predict(iphone$preprocessParams, iphone$test[,-59])
+iphone$test.pca$iphonesentiment <- iphone$test$iphonesentiment
+iphone$df.pca <- predict(iphone$preprocessParams, iphone$df[,-59])
+iphone$df.pca$iphonesentiment <- iphone$df$iphonesentiment
+
+galaxy$preprocessParams <- preProcess(galaxy$train[,-ncol(galaxy$train)], 
+                                      method="pca", 
+                                      thresh = 0.9)
+print(galaxy$preprocessParams)
+galaxy$train.pca <- predict(galaxy$preprocessParams, galaxy$train[,-59])
+galaxy$train.pca$galaxysentiment <- galaxy$train$galaxysentiment
+galaxy$test.pca <- predict(galaxy$preprocessParams, galaxy$test[,-59])
+galaxy$test.pca$galaxysentiment <- galaxy$test$galaxysentiment
+galaxy$df.pca <- predict(galaxy$preprocessParams, galaxy$df[,-59])
+galaxy$df.pca$galaxysentiment <- galaxy$df$galaxysentiment
+
+```
+
+## Preprocess and Modeling
+
+### Split the data and applying PCA method.
+
+In order to get the best possible results, I have removed all the duplicates from the dataframe to reduce the "noise".
+
+I have also split the data into a trainset (70% of the observations), and a testset.
+
+Finally, I have applied the PCA (*Principal Component Analysis*) that consist in removing all of the features and replaces them with mathematical representations of their variance.
+
+**For *iPhone Sentiment* **
+```{r iPhone PCA, echo=FALSE}
+print(iphone$preprocessParams)
+
+```
+
+**For *Galaxy Sentiment* **
+```{r Galaxy PCA, echo=FALSE}
+print(galaxy$preprocessParams)
+```
+### Train a model for *iPhone Sentiment*
+
+**SVM**
+
+**SVM** model has one of the best *Accuracy* based on this data frame, but the *Kappa* is poor if we compare it with the one for **C5.0**.
+
+```{r iphone SVM, echo=FALSE}
+iphone$svm <- svm(iphonesentiment ~.,
+                  data = iphone$train.pca)
+
+  # SVM
+postResample(predict(iphone$svm, newdata = iphone$df.pca),
+             iphone$df.pca$iphonesentiment)
+
+```
+
+**C5.0**
+
+We can observe that the best *Accuracy* and *Kappa* correspond to **C5.0** model, so this is the one that we'll be using to predict the iPhone Sentiment.
+
+```{r iphone C5.0, echo=FALSE}
+iphone$C5.0 <- readRDS("Models/iPhoneC5.0.rds")
+
+  # C5.0
+postResample(predict(iphone$C5.0, newdata = iphone$df.pca),
+             iphone$df.pca$iphonesentiment)
+
+```
+
+### Train a model for *Galaxy Sentiment*
+
+**SVM**
+For *Galaxy Sentiment*, we can observe that both **SVM** and **C5.0** models have a tie *Accuracy*, but this time, we'll use **SVM** model because has a slightly better *Kappa* than the **C5.0**.
+
+```{r Galaxy SVM, echo=FALSE}
+galaxy$svm <- svm(galaxysentiment ~.,
+                  data = galaxy$train.pca)
+
+  # SVM
+postResample(predict(galaxy$svm, newdata = galaxy$df.pca),
+             galaxy$df.pca$galaxysentiment)
+
+```
+
+**C5.0**
+
+On both cases (**SVM** and **C5.0** models), the *Kappa* is lower than the one for the *iPhone Sentiment*, and this indicates us that this model is not as reliable as it is desirable.
+
+```{r Galaxy C5.0, echo=FALSE}
+galaxy$C5.0 <- readRDS("Models/GalaxyC5.0.rds")
+
+  # C5.0
+postResample(predict(galaxy$C5.0, newdata = galaxy$df.pca),
+             galaxy$df.pca$galaxysentiment)
+
+```
+
+## Collecting the data
+
+### Scrapping the web with Amazon Web Services (AWS)
+
+**AWS** is a reliable, scalable, and inexpensive platform for the use of cloud applications and services and it will give us easy access to web data through one management console.
+
+With *Amazon Elastic Compute Cloud (EC2)* we can run application programs in the Amazon computing environment. EC2 can serve as a practically unlimited set of virtual machines
+
+With *Amazon Elastic MapReduce (EMR)* we can easily and cost-effectively process vast amounts of data.
+
+Finally, *Amazon Simple Storage Services (S3)* is storage designed to make web-scale computing easier for developers and provides a simple web services interface that can be used to store and retrieve any amount of data, at any time, from anywhere on the web.
+
+```{r Real Testset 1, echo = FALSE}
+# Loading the real Testset and applying the models ----
+RealTest <- read.csv("datasets/allfactors.csv")
+
+RealTest <- RealTest[2:59]
+
+iphone$realtest.pca <- predict(iphone$preprocessParams, RealTest)
+galaxy$realtest.pca <- predict(galaxy$preprocessParams, RealTest)
+RealTest$iphonesentiment <- predict(iphone$C5.0, newdata = iphone$realtest.pca)
+RealTest$galaxysentiment <- predict(galaxy$svm, newdata = galaxy$realtest.pca)
+```
+
+## Conclusions
+
+### iPhone vs Galaxy:
+
+At the below table we can see the sentiment predictions based on our predictive models.
+
+| *Sentiment* | **Apple iphone** |  **Samsung Galaxy** |
+|----------|:-------------:|:------:|
+| **0**: very negative | 25897 | 8857 |
+| **1**: negative | 0 | 0 |
+| **2**: somewhat negative | 1690 | 3012 |
+| **3**: somewhat positive | 2354| 0 |
+| **4**: positive | 1332 | 52 |
+| **5**: very positive | 26885 | 46237 |
+| **Mean** | **2.58** | **4.08** |
+
+We observe that there are a bast majority of websites who love Samsung Galaxy, while the Apple iPhone is somehow in between, as there are almost the same amount of websites that loves the iPhone than hates it.
+
+For that reason, we cautiously conclude that the Samsung Galaxy is more likely to be the device that *Alert Analytics* should chose to develop their APP.
+
+### Observations
+
+As we have already mentioned, the *Kappa* for **SVM** model in order to predict the sentiment through Samsung Galaxy device is not as good as desirable, as the *Kappa* is the coefficient that takes into account the possibility of the agreement occurring by chance. With a lower value of *Kappa*, our model does not really predict the reality better than mere chance.
+
+If we compare the amount of lines where both devices are equally valued, we can see that this is bast majority, as correspond to a nearly 58% of the times.
+
+```{r Real Testset 2, echo = FALSE}
+summary(RealTest[which(RealTest$galaxysentiment == RealTest$iphonesentiment),60])
+
+```
+
+```{r Real Testset 3, echo = FALSE}
+ggplot(RealTest, aes(x=iphonesentiment)) + 
+  geom_bar(colour="black", fill=brewer.pal(name = "RdBu", n=5)) +
+  labs(title = "iPhone Sentiment") + xlab(NULL)
+
+ggplot(RealTest, aes(x=galaxysentiment)) + 
+  geom_bar(colour="black", fill=brewer.pal(name = "YlGn", n=4)) +
+  labs(title = "Galaxy Sentiment") + xlab(NULL)
+
+```
+
+If we take a closer look at the *Very Possitive*, we observe that 25254 out of 26885 predictions for iphone match with the *Very Possitive* on Samsung Galaxy. This means that 94% of the times that the model predicts the higher score for the iPhone, it also does for the Galaxy.
+
+In my humble opinion, this is unrealistic, as we would expect that the majority of the reviews would take a "winner" (a device that is more likely for the user).
+```{r Real Testset 4, echo = FALSE}
+count(RealTest[which(RealTest$galaxysentiment == RealTest$iphonesentiment & RealTest$iphonesentiment == "5"),60])
+
+```
+
